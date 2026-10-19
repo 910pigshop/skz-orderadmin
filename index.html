@@ -185,7 +185,7 @@
                                 <th class="p-3.5">商品名稱</th>
                                 <th class="p-3.5">分類</th>
                                 <th class="p-3.5">上架開關</th>
-                                <th class="p-3.5">規格 / 售價 / 需預付訂金 / 庫存</th>
+                                <th class="p-3.5">規格 / 售價 / 預付訂金 / 限購 / 庫存</th>
                                 <th class="p-3.5 text-center">操作</th>
                             </tr>
                         </thead>
@@ -306,7 +306,7 @@
 
                 <div class="border-t border-[#E3D5C5] pt-3 space-y-3">
                     <div class="flex justify-between items-center">
-                        <label class="block text-xs font-bold text-[#4A3B32]">款式規格、訂金與售價設定</label>
+                        <label class="block text-xs font-bold text-[#4A3B32]">款式規格、訂金、限購與售價設定</label>
                         <button type="button" onclick="window.addVariantRow()" class="text-xs bg-[#F3E8DB] text-[#4A3B32] border border-[#D7C4B7] px-2.5 py-1 rounded-lg font-bold hover:bg-[#E3D5C5] transition cursor-pointer">+ 新增規格</button>
                     </div>
                     <div id="variant-input-list" class="space-y-3"></div>
@@ -358,10 +358,11 @@
             snapshot.forEach((d) => {
                 const data = d.data();
                 if (!data.variants || data.variants.length === 0) {
-                    data.variants = [{ name: '標準規格', costJPY: data.costJPY || 0, price: data.price || 0, deposit: data.price || 0, stock: data.stock || 0 }];
+                    data.variants = [{ name: '標準規格', costJPY: data.costJPY || 0, price: data.price || 0, deposit: data.price || 0, stock: data.stock || 0, maxPerPerson: data.maxPerPerson || 0 }];
                 }
                 data.variants.forEach(v => {
                     if (v.deposit === undefined) v.deposit = v.price || 0;
+                    if (v.maxPerPerson === undefined) v.maxPerPerson = 0;
                 });
 
                 let images = Array.isArray(data.images) ? data.images.filter(i => i && i.trim() !== "") : [];
@@ -651,7 +652,6 @@
             } catch (err) { alert("儲存失敗"); }
         };
 
-        /* --- 核心修正：商品 Modal 開啟與編輯帶入邏輯 --- */
         window.openProductModal = function(id, isDuplicate = false) {
             const modal = document.getElementById('product-modal');
             const form = document.getElementById('product-form');
@@ -667,7 +667,6 @@
                 const p = products.find(item => item.id === id);
                 if (!p) return;
 
-                // 核心關鍵：綁定 ID，防範編輯被覆寫成新增
                 idInput.value = isDuplicate ? '' : p.id;
                 
                 if (titleText) {
@@ -686,19 +685,19 @@
                 if (p.variants && p.variants.length > 0) {
                     p.variants.forEach(v => window.addVariantRow(v));
                 } else {
-                    window.addVariantRow({ name: '標準規格', costJPY: '', price: '', deposit: '', stock: '' });
+                    window.addVariantRow({ name: '標準規格', costJPY: '', price: '', deposit: '', stock: '', maxPerPerson: 0 });
                 }
             } else {
                 form.reset();
                 idInput.value = '';
                 if (titleText) titleText.textContent = '新增商品與規格';
-                window.addVariantRow({ name: '標準規格', costJPY: '', price: '', deposit: '', stock: '' });
+                window.addVariantRow({ name: '標準規格', costJPY: '', price: '', deposit: '', stock: '', maxPerPerson: 0 });
             }
         };
 
         window.closeProductModal = function() { document.getElementById('product-modal').classList.add('hidden'); };
 
-        /* --- 核心修正：商品表單送出（有 ID 更新，無 ID 新增） --- */
+        /* --- 核心：商品儲存時寫入每人限購數量 (maxPerPerson) --- */
         document.getElementById('product-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             const saveBtn = document.getElementById('save-product-btn');
@@ -723,13 +722,15 @@
                     const priceVal = Number(r.querySelector('.v-price').value) || 0;
                     const depositInput = r.querySelector('.v-deposit').value;
                     const depositVal = depositInput !== '' ? Number(depositInput) : priceVal;
-                    
+                    const maxPerPerson = Number(r.querySelector('.v-limit').value) || 0;
+
                     variants.push({
                         name: r.querySelector('.v-name').value.trim() || '標準規格',
                         costJPY: Number(r.querySelector('.v-cost').value) || 0,
                         price: priceVal,
                         deposit: depositVal,
-                        stock: Number(r.querySelector('.v-stock').value) || 0
+                        stock: Number(r.querySelector('.v-stock').value) || 0,
+                        maxPerPerson: maxPerPerson
                     });
                 });
 
@@ -743,11 +744,9 @@
                 };
 
                 if (id) {
-                    // 有 ID 執行【更新】
                     await Firestore.updateDoc(Firestore.doc(db, "products", id), productData);
                     alert('商品內容已成功更新！');
                 } else {
-                    // 無 ID 執行【新增】
                     productData.createdAt = new Date().toISOString();
                     await Firestore.addDoc(Firestore.collection(db, "products"), productData);
                     alert('新商品已成功新增！');
@@ -793,7 +792,7 @@
             tbody.innerHTML = filtered.map(p => {
                 const isActive = p.active !== false;
                 const variantsDisplay = p.variants.map(v => 
-                    `${v.name} - 售價NT$${v.price} | <span class="text-emerald-700 font-bold">預付訂金NT$${v.deposit}</span> (庫存:${v.stock})`
+                    `${v.name} - 售價NT$${v.price} | <span class="text-emerald-700 font-bold">預付訂金NT$${v.deposit}</span> | ${v.maxPerPerson > 0 ? `<span class="text-amber-800 font-bold">限購:${v.maxPerPerson}</span>` : '不限購'} (庫存:${v.stock})`
                 ).join('<br>');
 
                 const toggleActiveBtn = isActive ? 
@@ -816,8 +815,9 @@
             }).join('');
         }
 
+        /* --- 新增限購數量 (v-limit) 欄位 --- */
         window.addVariantRow = function(v) {
-            v = v || { name: '', costJPY: '', price: '', deposit: '', stock: '' };
+            v = v || { name: '', costJPY: '', price: '', deposit: '', stock: '', maxPerPerson: 0 };
             const container = document.getElementById('variant-input-list');
             const div = document.createElement('div');
             div.className = "variant-row grid grid-cols-12 gap-1.5 items-center p-2 rounded-xl border bg-[#F8F4EE] border-[#D7C4B7]";
@@ -825,8 +825,9 @@
             div.innerHTML = '<div class="col-span-3"><input type="text" placeholder="規格名稱" value="' + v.name + '" required class="v-name w-full px-2 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-white"></div>' +
                 '<div class="col-span-2"><input type="number" placeholder="日幣成本" value="' + v.costJPY + '" class="v-cost w-full px-2 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-white"></div>' +
                 '<div class="col-span-2"><input type="number" placeholder="台幣售價" value="' + v.price + '" required class="v-price w-full px-2 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-white font-bold text-[#967259]"></div>' +
-                '<div class="col-span-3"><input type="number" placeholder="需預付金額(訂金)" value="' + (v.deposit !== undefined ? v.deposit : v.price) + '" required class="v-deposit w-full px-2 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-emerald-50 font-bold text-emerald-800"></div>' +
-                '<div class="col-span-1"><input type="number" placeholder="庫存" value="' + v.stock + '" required class="v-stock w-full px-1.5 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-white font-bold"></div>' +
+                '<div class="col-span-2"><input type="number" placeholder="預付(訂金)" value="' + (v.deposit !== undefined ? v.deposit : v.price) + '" required class="v-deposit w-full px-2 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-emerald-50 font-bold text-emerald-800"></div>' +
+                '<div class="col-span-1"><input type="number" placeholder="限購" value="' + (v.maxPerPerson || 0) + '" title="每人限購數量 (0為不限)" class="v-limit w-full px-1 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-amber-50 font-bold text-amber-900"></div>' +
+                '<div class="col-span-1"><input type="number" placeholder="庫存" value="' + v.stock + '" required class="v-stock w-full px-1 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-white font-bold"></div>' +
                 '<div class="col-span-1 text-center"><button type="button" onclick="this.closest(\'.variant-row\').remove()" class="text-rose-500 text-xs p-1"><i class="fa-solid fa-trash-can"></i></button></div>';
 
             container.appendChild(div);
