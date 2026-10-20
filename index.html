@@ -949,6 +949,7 @@
         /* 2. 核心升級：以【商品/款式名稱】為標題列的排單 CSV 匯出 */
         /* 核心修正：移除標題列的 [分類] 前綴，直接顯示「商品名稱 - 款式規格」 */
 /* 方案：詳細排單在上方，最下方自動附帶【各品項與款式總計】 */
+/* BUG 修正版：嚴格確保「同一商品內，最早下單時間(00點)必在最前面」 */
 window.exportQueueToCSV = function() {
     const statusFilter = document.getElementById('filter-order-status').value;
     const categoryFilter = document.getElementById('filter-order-category').value;
@@ -962,14 +963,15 @@ window.exportQueueToCSV = function() {
 
     if (targetOrders.length === 0) return alert('目前無符合條件的排單資料。');
 
-    // 依下單時間由舊到新排序 (Earliest First)
-    targetOrders.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
-
     const queueList = [];
-    const summaryMap = {}; // 用於統計總數：Map<"商品_規格", 數量>
+    const summaryMap = {};
 
-    // 2. 展開所有購買明細並計算總數
+    // 2. 展開所有購買明細
     targetOrders.forEach(o => {
+        // 安全解析下單時間戳記
+        const rawTimeStamp = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+        const formattedTime = o.createdAt ? new Date(o.createdAt).toLocaleString() : '';
+
         (o.items || []).forEach(i => {
             if (!i.isOutOfStock) {
                 if (categoryFilter !== 'ALL' && i.category !== categoryFilter) return;
@@ -979,13 +981,13 @@ window.exportQueueToCSV = function() {
                     prodName: i.name,
                     variantName: i.variantName,
                     qty: i.quantity,
-                    time: o.createdAt ? new Date(o.createdAt).toLocaleString() : '',
+                    time: formattedTime,
                     nickname: o.groupNickname || '',
                     senderName: o.senderName || '',
-                    rawTime: new Date(o.createdAt || 0).getTime()
+                    rawTime: rawTimeStamp // 毫秒時間戳記，精準排序用
                 });
 
-                // 累加數量
+                // 累加總數
                 const sumKey = `${i.name} | ${i.variantName}`;
                 if (!summaryMap[sumKey]) {
                     summaryMap[sumKey] = { prodName: i.name, variantName: i.variantName, totalQty: 0 };
@@ -997,18 +999,25 @@ window.exportQueueToCSV = function() {
 
     if (queueList.length === 0) return alert('目前無未缺貨的商品可進行排單。');
 
-    // 依「商品名稱 -> 規格」分組排序，組內保持下單時間先後
+    // 3. 核心排序邏輯修正：
+    // 第一順位：商品名稱 (同商品聚在一起)
+    // 第二順位：下單時間 rawTime (毫秒時間戳記，由舊到新，絕對保證 00:29 在 05:39 前面)
+    // 第三順位：款式名稱
     queueList.sort((a, b) => {
         const prodComp = a.prodName.localeCompare(b.prodName);
         if (prodComp !== 0) return prodComp;
-        const variantComp = a.variantName.localeCompare(b.variantName);
-        if (variantComp !== 0) return variantComp;
-        return a.rawTime - b.rawTime;
+        
+        // 時間小的(較早下單)排前面
+        if (a.rawTime !== b.rawTime) {
+            return a.rawTime - b.rawTime;
+        }
+
+        return a.variantName.localeCompare(b.variantName);
     });
 
     let csvContent = "\uFEFF";
 
-    // 1. 上方：寫入【詳細購買排單順序名單】
+    // 4. 上方：寫入【詳細購買排單順序名單】
     csvContent += "=== 詳細購買排單順序名單 ===\n";
     csvContent += "商品名稱,款式規格,數量,下單時間,LINE群組暱稱,買家姓名\n";
 
@@ -1024,13 +1033,12 @@ window.exportQueueToCSV = function() {
         csvContent += row.join(',') + "\n";
     });
 
-    csvContent += "\n\n"; // 留空兩行分隔
+    csvContent += "\n\n";
 
-    // 2. 最下方：寫入【各品項與款式總計】
+    // 5. 最下方：寫入【各品項與款式採購總計】
     csvContent += "=== 各品項與款式採購總計 ===\n";
     csvContent += "商品名稱,款式規格,總需求數量\n";
     
-    // 依商品名稱與款式進行總計排序
     const sortedSummary = Object.values(summaryMap).sort((a, b) => 
         a.prodName.localeCompare(b.prodName) || a.variantName.localeCompare(b.variantName)
     );
