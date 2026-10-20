@@ -21,7 +21,10 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
     </style>
 </head>
-<body class="bg-[#FDFBF7] text-[#2C221E] min-h-screen flex flex-col font-sans antialiased">
+<body class="bg-[#FDFBF7] text-[#2C221E] min-h-screen flex flex-col font-sans antialiased relative">
+
+    <!-- Toast 即時提示通知區域 -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
     <!-- 頂部導覽列 -->
     <header class="bg-[#EFE6DC] text-[#2C221E] shadow-sm sticky top-0 z-40 border-b border-[#E3D5C5]">
@@ -186,7 +189,7 @@
                         <div class="flex items-center gap-2 flex-wrap w-full sm:w-auto">
                             <div class="relative flex-grow sm:w-64">
                                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-[#A08D7D] text-xs"></i>
-                                <input type="text" id="prod-search-input" oninput="renderAdminProducts()" placeholder="搜尋商品名稱..." class="w-full pl-8 pr-3 py-1.5 border border-[#D7C4B7] rounded-xl text-xs bg-[#FDFBF7] focus:ring-1 focus:ring-[#967259] focus:outline-none text-[#2C221E]">
+                                <input type="text" id="prod-search-input" oninput="debouncedRenderAdminProducts()" placeholder="搜尋商品名稱..." class="w-full pl-8 pr-3 py-1.5 border border-[#D7C4B7] rounded-xl text-xs bg-[#FDFBF7] focus:ring-1 focus:ring-[#967259] focus:outline-none text-[#2C221E]">
                             </div>
                             <select id="prod-category-filter" onchange="renderAdminProducts()" class="px-2.5 py-1.5 border border-[#D7C4B7] rounded-xl text-xs bg-[#FDFBF7] font-bold text-[#2C221E] focus:ring-1 focus:ring-[#967259] focus:outline-none">
                                 <option value="ALL">全部分類</option>
@@ -294,7 +297,7 @@
         </div>
     </div>
 
-    <!-- 商品編輯 Modal (已新增：自動下架時間設定) -->
+    <!-- 商品編輯 Modal -->
     <div id="product-modal" class="fixed inset-0 bg-[#2C221E]/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-2 sm:p-4">
         <div class="bg-[#FDFBF7] rounded-2xl shadow-2xl max-w-xl w-full p-4 sm:p-6 space-y-3 sm:space-y-4 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto border border-[#E3D5C5]">
             <h3 id="product-modal-title" class="font-bold text-base sm:text-lg text-[#4A3B32] font-serif-jp">新增商品與規格</h3>
@@ -320,7 +323,7 @@
                     </div>
                 </div>
 
-                <!-- 新增：自動下架時間欄位 -->
+                <!-- 自動下架時間欄位 -->
                 <div>
                     <label class="block text-xs font-bold text-[#4A3B32] mb-1">📅 自動下架時間 (選填，到達後前台將自動隱藏)</label>
                     <input type="datetime-local" id="prod-off-time" class="w-full px-3 py-2 border border-[#D7C4B7] rounded-xl focus:ring-1 focus:ring-[#967259] focus:outline-none text-xs bg-white text-[#2C221E]">
@@ -375,6 +378,36 @@
         let bankSettings = { accounts: [{ name: "中華郵政 (700)", account: "0001234-5678901" }], jpyRate: 0.22 };
         const FALLBACK_IMAGE = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 24 24' fill='none' stroke='%23d7c4b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E";
 
+        /* --- UI 工具函式：Toast 浮動提示 --- */
+        window.showToast = function(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            const bgClass = type === 'success' ? 'bg-[#967259] text-white' : 'bg-rose-600 text-white';
+            toast.className = `${bgClass} px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold flex items-center gap-2 transition-all duration-300 opacity-0 translate-y-2 pointer-events-auto`;
+            toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i> <span>${message}</span>`;
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('opacity-0', 'translate-y-2');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        };
+
+        /* --- 防抖函數 (Debounce) --- */
+        function debounce(func, delay = 300) {
+            let timer;
+            return function(...args) {
+                clearTimeout(timer);
+                timer = setTimeout(() => func.apply(this, args), delay);
+            };
+        }
+        window.debouncedRenderAdminProducts = debounce(() => renderAdminProducts(), 250);
+
         function convertGoogleDriveUrl(url) {
             if (!url) return '';
             url = url.trim();
@@ -386,6 +419,7 @@
             return url;
         }
 
+        /* --- Firestore 監聽器 --- */
         Firestore.onSnapshot(Firestore.collection(db, "categories"), (snapshot) => {
             categories = [];
             snapshot.forEach((d) => categories.push({ id: d.id, ...d.data() }));
@@ -437,17 +471,22 @@
             }
         });
 
+        /* --- 驗證與分頁導覽 --- */
         document.getElementById('admin-login-form').addEventListener('submit', function(e) {
             e.preventDefault();
             if (document.getElementById('admin-pwd-input').value === 'admin123') {
                 document.getElementById('admin-login-box').classList.add('hidden');
                 document.getElementById('admin-dashboard').classList.remove('hidden');
-            } else { alert('密碼錯誤！'); }
+                showToast('成功登入管理後台');
+            } else { 
+                showToast('密碼錯誤！', 'error'); 
+            }
         });
 
         document.getElementById('admin-logout-btn').addEventListener('click', function() {
             document.getElementById('admin-login-box').classList.remove('hidden');
             document.getElementById('admin-dashboard').classList.add('hidden');
+            showToast('已安全登出');
         });
 
         window.switchAdminTab = function(tab) {
@@ -505,7 +544,12 @@
 
         window.deleteCategory = async function(id) {
             if (!confirm('確定要刪除此分類嗎？')) return;
-            await Firestore.deleteDoc(Firestore.doc(db, "categories", id));
+            try {
+                await Firestore.deleteDoc(Firestore.doc(db, "categories", id));
+                showToast('分類已刪除');
+            } catch (err) {
+                showToast('刪除分類失敗', 'error');
+            }
         };
 
         function updateOrderProductFilterOptions() {
@@ -539,7 +583,6 @@
             document.getElementById('completed-count-badge').textContent = `共 ${completedOrders.length} 筆`;
         };
 
-        // 核心修改：渲染訂單列表前，強制依照下單時間由新到舊 (最新下單排最上面) 排序
         function renderPaginatedOrders(tbodyId, list, isActiveMode) {
             const tbody = document.getElementById(tbodyId);
             if (list.length === 0) {
@@ -547,17 +590,17 @@
                 return;
             }
 
-            // 新到舊排序 (Newest First)
+            // 強制時間由新到舊 (Newest First) 排序
             list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
             const statusOptions = ["待查帳", "已確認付款", "商品理貨中", "國際運輸中", "包裹已抵台", "請至賣貨便下單", "訂單已完成"];
 
             tbody.innerHTML = list.map(o => {
-                const statusSelectHTML = `<select onchange="window.updateSingleOrderStatus('${o.id}', this.value)" class="px-2 py-1 border border-[#D7C4B7] rounded-xl text-xs font-bold text-[#4A3B32] bg-[#FDFBF7]">` +
+                const statusSelectHTML = `<select onchange="window.updateSingleOrderStatus('${o.id}', this.value)" class="px-2 py-1 border border-[#D7C4B7] rounded-xl text-xs font-bold text-[#4A3B32] bg-[#FDFBF7] focus:outline-none focus:ring-1 focus:ring-[#967259]">` +
                     statusOptions.map(st => `<option value="${st}" ${st === (o.status || '待查帳') ? 'selected' : ''}>${st}</option>`).join('') +
                 `</select>`;
 
-                return `<tr class="border-b border-[#E3D5C5] hover:bg-[#F8F4EE] transition-colors ${o.isModified ? 'bg-amber-50/30' : ''}">` +
+                return `<tr class="border-b border-[#E3D5C5] hover:bg-[#F8F4EE] transition-colors ${o.isModified ? 'bg-amber-50/40' : ''}">` +
                     (isActiveMode ? '<td class="p-3 text-center"><input type="checkbox" value="' + o.id + '" class="order-checkbox rounded cursor-pointer"></td>' : '') +
                     '<td class="p-3">' +
                         '<div class="font-bold text-[#967259] text-xs sm:text-sm">' + (o.orderNo || o.id) + '</div>' +
@@ -588,7 +631,7 @@
                     '</td>' +
                     (isActiveMode ? 
                     '<td class="p-3">' +
-                        '<input type="number" step="0.01" onchange="window.updateOrderWeight(\'' + o.id + '\', this.value)" value="' + (o.weight || '') + '" placeholder="0.00" class="w-14 sm:w-16 px-1.5 py-1 text-xs border border-[#D7C4B7] rounded bg-[#FDFBF7] text-[#2C221E]">' +
+                        '<input type="number" step="0.01" onchange="window.updateOrderWeight(\'' + o.id + '\', this.value)" value="' + (o.weight || '') + '" placeholder="0.00" class="w-14 sm:w-16 px-1.5 py-1 text-xs border border-[#D7C4B7] rounded bg-[#FDFBF7] text-[#2C221E] focus:outline-none focus:ring-1 focus:ring-[#967259]">' +
                     '</td>' : '') +
                     '<td class="p-3">' + statusSelectHTML + '</td>' +
                     '<td class="p-3 text-center">' +
@@ -599,32 +642,55 @@
         }
 
         window.updateSingleOrderStatus = async function(orderId, newStatus) {
-            try { await Firestore.updateDoc(Firestore.doc(db, "orders", orderId), { status: newStatus }); }
-            catch (err) { alert("更新失敗，請重試。"); }
+            try { 
+                await Firestore.updateDoc(Firestore.doc(db, "orders", orderId), { status: newStatus }); 
+                showToast(`訂單狀態已改為【${newStatus}】`);
+            } catch (err) { 
+                showToast("狀態更新失敗，請重試", "error"); 
+            }
         };
 
         window.updateOrderWeight = async function(orderId, weightVal) {
-            try { await Firestore.updateDoc(Firestore.doc(db, "orders", orderId), { weight: weightVal }); }
-            catch (err) { alert("更新重量失敗"); }
+            try { 
+                await Firestore.updateDoc(Firestore.doc(db, "orders", orderId), { weight: weightVal }); 
+                showToast('重量已更新');
+            } catch (err) { 
+                showToast("更新重量失敗", "error"); 
+            }
         };
 
         window.deleteOrder = async function(orderId) {
             if (!confirm("確定要刪除這筆訂單嗎？此操作無法復原。")) return;
-            try { await Firestore.deleteDoc(Firestore.doc(db, "orders", orderId)); }
-            catch (err) { alert("刪除失敗"); }
+            try { 
+                await Firestore.deleteDoc(Firestore.doc(db, "orders", orderId)); 
+                showToast('訂單已順利刪除');
+            } catch (err) { 
+                showToast("刪除訂單失敗", "error"); 
+            }
         };
 
         window.toggleSelectAllOrders = function(source) {
             document.querySelectorAll('.order-checkbox').forEach(cb => cb.checked = source.checked);
         };
 
+        /* 效能優化：改用 Firestore writeBatch 批次更新 */
         window.batchUpdateOrderStatus = async function() {
             const checkboxes = document.querySelectorAll('.order-checkbox:checked');
             if (checkboxes.length === 0) return alert('請先勾選訂單！');
             const targetStatus = document.getElementById('batch-target-status').value;
             if (!confirm(`確定要將 ${checkboxes.length} 筆訂單改為【${targetStatus}】？`)) return;
-            for (const cb of checkboxes) await Firestore.updateDoc(Firestore.doc(db, "orders", cb.value), { status: targetStatus });
-            alert('批次更新完成！');
+            
+            try {
+                const batch = Firestore.writeBatch(db);
+                checkboxes.forEach(cb => {
+                    const docRef = Firestore.doc(db, "orders", cb.value);
+                    batch.update(docRef, { status: targetStatus });
+                });
+                await batch.commit();
+                showToast(`已成功批次更新 ${checkboxes.length} 筆訂單！`);
+            } catch (err) {
+                showToast("批次更新失敗，請再試一次", "error");
+            }
         };
 
         window.openEditOrderModal = function(orderId) {
@@ -708,11 +774,12 @@
                     isModified: true
                 });
                 closeEditOrderModal();
-                alert('訂單金額與微調結果已更新！');
-            } catch (err) { alert("儲存失敗"); }
+                showToast('訂單明細與金額已成功修改');
+            } catch (err) { 
+                showToast("儲存失敗，請重試", "error"); 
+            }
         };
 
-        // 開啟商品 Modal (載入與重置 offTime 欄位)
         window.openProductModal = function(id, isDuplicate = false) {
             const modal = document.getElementById('product-modal');
             const form = document.getElementById('product-form');
@@ -760,7 +827,7 @@
 
         window.closeProductModal = function() { document.getElementById('product-modal').classList.add('hidden'); };
 
-        // 儲存商品表單 (新增讀取與寫入 offTime)
+        /* 儲存商品表單 */
         document.getElementById('product-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             const saveBtn = document.getElementById('save-product-btn');
@@ -810,17 +877,17 @@
 
                 if (id) {
                     await Firestore.updateDoc(Firestore.doc(db, "products", id), productData);
-                    alert('商品內容已成功更新！');
+                    showToast('商品內容已成功更新！');
                 } else {
                     productData.createdAt = new Date().toISOString();
                     await Firestore.addDoc(Firestore.collection(db, "products"), productData);
-                    alert('新商品已成功新增！');
+                    showToast('新商品已成功新增！');
                 }
 
                 closeProductModal();
             } catch (err) {
                 console.error("儲存商品失敗:", err);
-                alert('儲存商品時發生錯誤，請稍後再試。');
+                showToast('儲存商品失敗，請稍後再試', 'error');
             } finally {
                 saveBtn.disabled = false;
                 saveBtn.textContent = '儲存商品';
@@ -828,15 +895,25 @@
         });
 
         window.toggleProductActive = async function(prodId, currentActive) {
-            await Firestore.updateDoc(Firestore.doc(db, "products", prodId), { active: !currentActive });
+            try {
+                await Firestore.updateDoc(Firestore.doc(db, "products", prodId), { active: !currentActive });
+                showToast(currentActive ? '商品已下架' : '商品已上架');
+            } catch (err) {
+                showToast('變更狀態失敗', 'error');
+            }
         };
 
         window.deleteProduct = async function(prodId) {
             if (!confirm('確定要刪除此商品嗎？此操作不可復原。')) return;
-            await Firestore.deleteDoc(Firestore.doc(db, "products", prodId));
+            try {
+                await Firestore.deleteDoc(Firestore.doc(db, "products", prodId));
+                showToast('商品已刪除');
+            } catch (err) {
+                showToast('刪除商品失敗', 'error');
+            }
         };
 
-        // 渲染商品列表 (顯示下架時間資訊)
+        /* 渲染商品列表 (含自動下架時間即時過期比對) */
         function renderAdminProducts() {
             const tbody = document.getElementById('admin-products-tbody');
             const searchKeyword = document.getElementById('prod-search-input')?.value.toLowerCase().trim() || '';
@@ -855,8 +932,12 @@
                 return;
             }
 
+            const nowTime = new Date().getTime();
+
             tbody.innerHTML = filtered.map(p => {
                 const isActive = p.active !== false;
+                const isExpired = p.offTime ? new Date(p.offTime).getTime() <= nowTime : false;
+
                 const variantsDisplay = p.variants.map(v => 
                     `${v.name} - 售價NT$${v.price} | <span class="text-emerald-700 font-bold">預付NT$${v.deposit}</span> | ${v.maxPerPerson > 0 ? `<span class="text-amber-800 font-bold">限購:${v.maxPerPerson}</span>` : '不限購'} (庫存:${v.stock})`
                 ).join('<br>');
@@ -865,7 +946,14 @@
                     `<button onclick="window.toggleProductActive('${p.id}', true)" class="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold cursor-pointer">🟢 上架</button>` :
                     `<button onclick="window.toggleProductActive('${p.id}', false)" class="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold cursor-pointer">⚪ 下架</button>`;
 
-                const offTimeDisplay = p.offTime ? `<div class="text-[10px] text-rose-700 font-bold mt-1">📅 自動下架: ${new Date(p.offTime).toLocaleString()}</div>` : '';
+                let offTimeDisplay = '';
+                if (p.offTime) {
+                    if (isExpired) {
+                        offTimeDisplay = `<div class="text-[10px] text-rose-600 font-bold mt-1"><i class="fa-solid fa-clock-rotate-left"></i> 已過期 (自動隱藏)</div>`;
+                    } else {
+                        offTimeDisplay = `<div class="text-[10px] text-amber-700 font-bold mt-1">📅 下架: ${new Date(p.offTime).toLocaleString()}</div>`;
+                    }
+                }
 
                 return `<tr class="border-b border-[#E3D5C5] hover:bg-[#F8F4EE]">` +
                     '<td class="p-3 text-center"><input type="checkbox" class="product-checkbox rounded"></td>' +
@@ -883,6 +971,7 @@
             }).join('');
         }
 
+        /* 防呆與自動填入：當更改售價且預付為空時自動覆蓋預付 */
         window.addVariantRow = function(v) {
             v = v || { name: '', costJPY: '', price: '', deposit: '', stock: '', maxPerPerson: 0 };
             const container = document.getElementById('variant-input-list');
@@ -891,13 +980,22 @@
 
             div.innerHTML = '<div class="col-span-3"><input type="text" placeholder="規格" value="' + v.name + '" required class="v-name w-full px-1.5 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-white"></div>' +
                 '<div class="col-span-2"><input type="number" placeholder="日幣" value="' + v.costJPY + '" class="v-cost w-full px-1.5 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-white"></div>' +
-                '<div class="col-span-2"><input type="number" placeholder="售價" value="' + v.price + '" required class="v-price w-full px-1.5 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-white font-bold text-[#967259]"></div>' +
+                '<div class="col-span-2"><input type="number" placeholder="售價" value="' + v.price + '" required oninput="autoFillDeposit(this)" class="v-price w-full px-1.5 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-white font-bold text-[#967259]"></div>' +
                 '<div class="col-span-2"><input type="number" placeholder="預付" value="' + (v.deposit !== undefined ? v.deposit : v.price) + '" required class="v-deposit w-full px-1 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-emerald-50 font-bold text-emerald-800"></div>' +
                 '<div class="col-span-1"><input type="number" placeholder="限購" value="' + (v.maxPerPerson || 0) + '" title="每人限購數量 (0為不限)" class="v-limit w-full px-1 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-amber-50 font-bold text-amber-900"></div>' +
                 '<div class="col-span-1"><input type="number" placeholder="庫存" value="' + v.stock + '" required class="v-stock w-full px-1 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-white font-bold"></div>' +
-                '<div class="col-span-1 text-center"><button type="button" onclick="this.closest(\'.variant-row\').remove()" class="text-rose-500 text-xs p-1"><i class="fa-solid fa-trash-can"></i></button></div>';
+                '<div class="col-span-1 text-center"><button type="button" onclick="this.closest(\'.variant-row\').remove()" class="text-rose-500 text-xs p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></div>';
 
             container.appendChild(div);
+        };
+
+        window.autoFillDeposit = function(priceInput) {
+            const row = priceInput.closest('.variant-row');
+            if (!row) return;
+            const depositInput = row.querySelector('.v-deposit');
+            if (depositInput && (!depositInput.value || depositInput.dataset.userEdited !== 'true')) {
+                depositInput.value = priceInput.value;
+            }
         };
 
         function addBankAccountRow(acc) {
@@ -907,7 +1005,7 @@
             div.className = "bank-account-row grid grid-cols-12 gap-2 items-center bg-[#F8F4EE] p-2.5 sm:p-3 rounded-xl border border-[#D7C4B7]";
             div.innerHTML = '<div class="col-span-5"><input type="text" placeholder="銀行名稱" value="' + acc.name + '" required class="bank-name-input w-full px-2 py-1.5 border border-[#D7C4B7] rounded-lg text-xs bg-white"></div>' +
                 '<div class="col-span-6"><input type="text" placeholder="帳號" value="' + acc.account + '" required class="bank-acc-input w-full px-2 py-1.5 border border-[#D7C4B7] rounded-lg text-xs bg-white"></div>' +
-                '<div class="col-span-1 text-center"><button type="button" onclick="this.closest(\'.bank-account-row\').remove()" class="text-rose-500 text-xs p-1"><i class="fa-solid fa-trash-can"></i></button></div>';
+                '<div class="col-span-1 text-center"><button type="button" onclick="this.closest(\'.bank-account-row\').remove()" class="text-rose-500 text-xs p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></div>';
             container.appendChild(div);
         }
 
@@ -919,17 +1017,32 @@
             const rows = document.querySelectorAll('.bank-account-row');
             const accounts = [];
             rows.forEach(r => accounts.push({ name: r.querySelector('.bank-name-input').value.trim(), account: r.querySelector('.bank-acc-input').value.trim() }));
-            await Firestore.setDoc(Firestore.doc(db, "settings", "bank"), { accounts, jpyRate });
-            alert('設定儲存成功！');
+            try {
+                await Firestore.setDoc(Firestore.doc(db, "settings", "bank"), { accounts, jpyRate });
+                showToast('商店與匯率設定儲存成功！');
+            } catch (err) {
+                showToast('設定儲存失敗', 'error');
+            }
         });
 
         document.getElementById('category-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             const nameInput = document.getElementById('new-category-name');
-            await Firestore.addDoc(Firestore.collection(db, "categories"), { name: nameInput.value.trim() });
-            nameInput.value = '';
-            alert('分類新增成功！');
+            try {
+                await Firestore.addDoc(Firestore.collection(db, "categories"), { name: nameInput.value.trim() });
+                nameInput.value = '';
+                showToast('分類新增成功！');
+            } catch (err) {
+                showToast('新增分類失敗', 'error');
+            }
         });
+
+        /* 通用安全轉義 CSV 欄位文字 */
+        function safeCSVCell(val) {
+            if (val === null || val === undefined) return '""';
+            const str = String(val).replace(/"/g, '""');
+            return `"${str}"`;
+        }
 
         /* 1. 財務對帳表 CSV 匯出 */
         window.exportOrdersToCSV = function() {
@@ -939,19 +1052,19 @@
             ordersCache.forEach(o => {
                 const itemsStr = o.items ? o.items.map(i => `${i.name}(${i.variantName})x${i.quantity}`).join(';') : '';
                 const row = [
-                    o.orderNo || o.id,
-                    o.createdAt ? new Date(o.createdAt).toLocaleString() : '',
-                    o.groupNickname || '',
-                    o.socialAccount || '',
-                    `"${itemsStr.replace(/"/g, '""')}"`,
+                    safeCSVCell(o.orderNo || o.id),
+                    safeCSVCell(o.createdAt ? new Date(o.createdAt).toLocaleString() : ''),
+                    safeCSVCell(o.groupNickname || ''),
+                    safeCSVCell(o.socialAccount || ''),
+                    safeCSVCell(itemsStr),
                     o.totalAmount || 0,
                     o.totalDepositAmount || 0,
                     o.totalBalanceAmount || 0,
-                    o.senderName || '',
-                    o.accountLastFive || '',
+                    safeCSVCell(o.senderName || ''),
+                    safeCSVCell(o.accountLastFive || ''),
                     o.payAmount || 0,
-                    o.weight || '',
-                    o.status || ''
+                    safeCSVCell(o.weight || ''),
+                    safeCSVCell(o.status || '')
                 ];
                 csvContent += row.join(',') + "\n";
             });
@@ -963,114 +1076,105 @@
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            showToast('已完成財務對帳表匯出');
         };
 
-        /* 2. 核心升級：以【商品/款式名稱】為標題列的排單 CSV 匯出 */
+        /* 2. 採購排單與總計 CSV 匯出 */
         window.exportQueueToCSV = function() {
-    const statusFilter = document.getElementById('filter-order-status').value;
-    const categoryFilter = document.getElementById('filter-order-category').value;
-    const productFilter = document.getElementById('filter-order-product').value;
+            const statusFilter = document.getElementById('filter-order-status').value;
+            const categoryFilter = document.getElementById('filter-order-category').value;
+            const productFilter = document.getElementById('filter-order-product').value;
 
-    // 1. 篩選未完成的訂單
-    let targetOrders = ordersCache.filter(o => o.status !== '訂單已完成');
-    if (statusFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.status === statusFilter);
-    if (categoryFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.items && o.items.some(i => i.category === categoryFilter));
-    if (productFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.items && o.items.some(i => `${i.name} (${i.variantName})` === productFilter));
+            let targetOrders = ordersCache.filter(o => o.status !== '訂單已完成');
+            if (statusFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.status === statusFilter);
+            if (categoryFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.items && o.items.some(i => i.category === categoryFilter));
+            if (productFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.items && o.items.some(i => `${i.name} (${i.variantName})` === productFilter));
 
-    if (targetOrders.length === 0) return alert('目前無符合條件的排單資料。');
+            if (targetOrders.length === 0) return alert('目前無符合條件的排單資料。');
 
-    const queueList = [];
-    const summaryMap = {};
+            const queueList = [];
+            const summaryMap = {};
 
-    // 2. 展開所有購買明細
-    targetOrders.forEach(o => {
-        // 安全解析下單時間戳記
-        const rawTimeStamp = o.createdAt ? new Date(o.createdAt).getTime() : 0;
-        const formattedTime = o.createdAt ? new Date(o.createdAt).toLocaleString() : '';
+            targetOrders.forEach(o => {
+                const rawTimeStamp = o.createdAt ? new Date(o.createdAt).getTime() : 0;
+                const formattedTime = o.createdAt ? new Date(o.createdAt).toLocaleString() : '';
 
-        (o.items || []).forEach(i => {
-            if (!i.isOutOfStock) {
-                if (categoryFilter !== 'ALL' && i.category !== categoryFilter) return;
-                if (productFilter !== 'ALL' && `${i.name} (${i.variantName})` !== productFilter) return;
-                
-                queueList.push({
-                    prodName: i.name,
-                    variantName: i.variantName,
-                    qty: i.quantity,
-                    time: formattedTime,
-                    nickname: o.groupNickname || '',
-                    senderName: o.senderName || '',
-                    rawTime: rawTimeStamp // 毫秒時間戳記，精準排序用
+                (o.items || []).forEach(i => {
+                    if (!i.isOutOfStock) {
+                        if (categoryFilter !== 'ALL' && i.category !== categoryFilter) return;
+                        if (productFilter !== 'ALL' && `${i.name} (${i.variantName})` !== productFilter) return;
+                        
+                        queueList.push({
+                            prodName: i.name,
+                            variantName: i.variantName,
+                            qty: i.quantity,
+                            time: formattedTime,
+                            nickname: o.groupNickname || '',
+                            senderName: o.senderName || '',
+                            rawTime: rawTimeStamp
+                        });
+
+                        const sumKey = `${i.name} | ${i.variantName}`;
+                        if (!summaryMap[sumKey]) {
+                            summaryMap[sumKey] = { prodName: i.name, variantName: i.variantName, totalQty: 0 };
+                        }
+                        summaryMap[sumKey].totalQty += i.quantity;
+                    }
                 });
+            });
 
-                // 累加總數
-                const sumKey = `${i.name} | ${i.variantName}`;
-                if (!summaryMap[sumKey]) {
-                    summaryMap[sumKey] = { prodName: i.name, variantName: i.variantName, totalQty: 0 };
+            if (queueList.length === 0) return alert('目前無未缺貨的商品可進行排單。');
+
+            queueList.sort((a, b) => {
+                const prodComp = a.prodName.localeCompare(b.prodName);
+                if (prodComp !== 0) return prodComp;
+                
+                if (a.rawTime !== b.rawTime) {
+                    return a.rawTime - b.rawTime;
                 }
-                summaryMap[sumKey].totalQty += i.quantity;
-            }
-        });
-    });
 
-    if (queueList.length === 0) return alert('目前無未缺貨的商品可進行排單。');
+                return a.variantName.localeCompare(b.variantName);
+            });
 
-    // 3. 核心排序邏輯修正：
-    // 第一順位：商品名稱 (同商品聚在一起)
-    // 第二順位：下單時間 rawTime (毫秒時間戳記，由舊到新，絕對保證 00:29 在 05:39 前面)
-    // 第三順位：款式名稱
-    queueList.sort((a, b) => {
-        const prodComp = a.prodName.localeCompare(b.prodName);
-        if (prodComp !== 0) return prodComp;
-        
-        // 時間小的(較早下單)排前面
-        if (a.rawTime !== b.rawTime) {
-            return a.rawTime - b.rawTime;
-        }
+            let csvContent = "\uFEFF";
 
-        return a.variantName.localeCompare(b.variantName);
-    });
+            csvContent += "=== 詳細購買排單順序名單 ===\n";
+            csvContent += "商品名稱,款式規格,數量,下單時間,LINE群組暱稱,買家姓名\n";
 
-    let csvContent = "\uFEFF";
+            queueList.forEach(item => {
+                const row = [
+                    safeCSVCell(item.prodName),
+                    safeCSVCell(item.variantName),
+                    item.qty,
+                    safeCSVCell(item.time),
+                    safeCSVCell(item.nickname),
+                    safeCSVCell(item.senderName)
+                ];
+                csvContent += row.join(',') + "\n";
+            });
 
-    // 4. 上方：寫入【詳細購買排單順序名單】
-    csvContent += "=== 詳細購買排單順序名單 ===\n";
-    csvContent += "商品名稱,款式規格,數量,下單時間,LINE群組暱稱,買家姓名\n";
+            csvContent += "\n\n";
 
-    queueList.forEach(item => {
-        const row = [
-            `"${item.prodName.replace(/"/g, '""')}"`,
-            `"${item.variantName.replace(/"/g, '""')}"`,
-            item.qty,
-            item.time,
-            `"${item.nickname.replace(/"/g, '""')}"`,
-            `"${item.senderName.replace(/"/g, '""')}"`
-        ];
-        csvContent += row.join(',') + "\n";
-    });
+            csvContent += "=== 各品項與款式採購總計 ===\n";
+            csvContent += "商品名稱,款式規格,總需求數量\n";
+            
+            const sortedSummary = Object.values(summaryMap).sort((a, b) => 
+                a.prodName.localeCompare(b.prodName) || a.variantName.localeCompare(b.variantName)
+            );
 
-    csvContent += "\n\n";
+            sortedSummary.forEach(s => {
+                csvContent += `${safeCSVCell(s.prodName)},${safeCSVCell(s.variantName)},${s.totalQty}\n`;
+            });
 
-    // 5. 最下方：寫入【各品項與款式採購總計】
-    csvContent += "=== 各品項與款式採購總計 ===\n";
-    csvContent += "商品名稱,款式規格,總需求數量\n";
-    
-    const sortedSummary = Object.values(summaryMap).sort((a, b) => 
-        a.prodName.localeCompare(b.prodName) || a.variantName.localeCompare(b.variantName)
-    );
-
-    sortedSummary.forEach(s => {
-        csvContent += `"${s.prodName.replace(/"/g, '""')}","${s.variantName.replace(/"/g, '""')}",${s.totalQty}\n`;
-    });
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `STAY代購_採購排單與數量總計_${new Date().toISOString().slice(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-};
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", `STAY代購_採購排單與數量總計_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast('已完成採購排單表匯出');
+        };
     </script>
 </body>
 </html>
