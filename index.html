@@ -88,7 +88,7 @@
                             </div>
 
                             <div class="flex items-center gap-1.5 w-full sm:w-auto">
-                                <label class="text-xs font-bold text-[#4A3B32] whitespace-nowrap"><i class="fa-solid fa-[#967259] fa-tags"></i> 分類：</label>
+                                <label class="text-xs font-bold text-[#4A3B32] whitespace-nowrap"><i class="fa-solid fa-tags text-[#967259]"></i> 分類：</label>
                                 <select id="filter-order-category" onchange="renderAllOrderTables()" class="flex-grow sm:flex-grow-0 px-2.5 py-1.5 border border-[#D7C4B7] rounded-xl text-xs bg-[#FDFBF7] font-bold text-[#2C221E] focus:ring-1 focus:ring-[#967259] focus:outline-none">
                                     <option value="ALL">全部分類</option>
                                 </select>
@@ -105,7 +105,7 @@
                         <!-- 雙 CSV 匯出按鈕 -->
                         <div class="flex items-center gap-2 w-full lg:w-auto">
                             <button onclick="exportQueueToCSV()" class="flex-1 lg:flex-none bg-[#7D6B5D] hover:bg-[#634832] text-white px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer">
-                                <i class="fa-solid fa-list-ol"></i> 匯出排單順序 (CSV)
+                                <i class="fa-solid fa-list-ol"></i> 匯出商品排單表 (CSV)
                             </button>
                             <button onclick="exportOrdersToCSV()" class="flex-1 lg:flex-none bg-[#967259] hover:bg-[#634832] text-white px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer">
                                 <i class="fa-solid fa-file-excel"></i> 匯出財務試算表 (CSV)
@@ -470,7 +470,6 @@
             if (filterSelect) filterSelect.innerHTML = filterHtml;
         }
 
-        /* 核心更新：訂單篩選區的「商品分類」選單 */
         function updateOrderCategoryFilterOptions() {
             const select = document.getElementById('filter-order-category');
             if (!select) return;
@@ -517,7 +516,6 @@
             select.value = currentVal;
         }
 
-        /* 核心更新：訂單列表渲染（加入分類篩選條件） */
         window.renderAllOrderTables = function() {
             const statusFilter = document.getElementById('filter-order-status').value;
             const categoryFilter = document.getElementById('filter-order-category').value;
@@ -914,7 +912,7 @@
             alert('分類新增成功！');
         });
 
-        /* 1. 原有：財務試算表 CSV 匯出 */
+        /* 1. 財務對帳表 CSV 匯出 */
         window.exportOrdersToCSV = function() {
             if (ordersCache.length === 0) return alert('目前沒有可導出的訂單資料。');
             let csvContent = "\uFEFF訂單編號,下單時間,LINE暱稱,IG帳號,商品明細,總金額,已預付訂金,賣貨便尾款,對帳戶名,帳號末5碼,實際轉帳金額,包裹重量(kg),訂單狀態\n";
@@ -948,13 +946,13 @@
             document.body.removeChild(link);
         };
 
-        /* 2. 新增核心：排單順序 (按結帳時間先後) CSV 匯出 */
+        /* 2. 核心升級：以【商品/款式名稱】為標題列的排單 CSV 匯出 */
         window.exportQueueToCSV = function() {
             const statusFilter = document.getElementById('filter-order-status').value;
             const categoryFilter = document.getElementById('filter-order-category').value;
             const productFilter = document.getElementById('filter-order-product').value;
 
-            // 取得目前的訂單並根據篩選過濾
+            // 1. 篩選符合條件的訂單
             let targetOrders = ordersCache.filter(o => o.status !== '訂單已完成');
             if (statusFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.status === statusFilter);
             if (categoryFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.items && o.items.some(i => i.category === categoryFilter));
@@ -965,21 +963,44 @@
             // 依下單時間由舊到新排序 (Earliest First)
             targetOrders.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
 
-            let csvContent = "\uFEFF排單順位,LINE群組暱稱,匯款戶名/姓名,購買內容\n";
+            // 2. 蒐集並建立所有出現在這些訂單中的「商品-規格」清單 (做為 CSV 標題欄位)
+            const itemKeySet = new Set();
+            targetOrders.forEach(o => {
+                (o.items || []).forEach(i => {
+                    if (!i.isOutOfStock) {
+                        if (categoryFilter !== 'ALL' && i.category !== categoryFilter) return;
+                        if (productFilter !== 'ALL' && `${i.name} (${i.variantName})` !== productFilter) return;
+                        itemKeySet.add(`[${i.category || '選物'}] ${i.name} - ${i.variantName}`);
+                    }
+                });
+            });
 
+            const itemHeaders = Array.from(itemKeySet);
+            if (itemHeaders.length === 0) return alert('目前無未缺貨的商品款式可進行排單。');
+
+            // 3. 組成 CSV 標題列
+            let csvContent = "\uFEFF順位,下單時間,LINE群組暱稱,買家姓名," + itemHeaders.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + "\n";
+
+            // 4. 逐筆填充每個買家的購買數量
             targetOrders.forEach((o, index) => {
-                // 若選了特定分類或商品，只列出符合該條件且未缺貨的品項；若全選則列出全部未缺貨品項
-                let validItems = (o.items || []).filter(i => !i.isOutOfStock);
-                if (categoryFilter !== 'ALL') validItems = validItems.filter(i => i.category === categoryFilter);
-                if (productFilter !== 'ALL') validItems = validItems.filter(i => `${i.name} (${i.variantName})` === productFilter);
+                // 建立該訂單買家的購買數量映射表 Map<ItemKey, Quantity>
+                const userItemQtyMap = {};
+                (o.items || []).forEach(i => {
+                    if (!i.isOutOfStock) {
+                        const key = `[${i.category || '選物'}] ${i.name} - ${i.variantName}`;
+                        userItemQtyMap[key] = (userItemQtyMap[key] || 0) + i.quantity;
+                    }
+                });
 
-                const itemsStr = validItems.map(i => `${i.name} (${i.variantName}) x${i.quantity}`).join(' ; ');
+                // 對應標題填寫數量（若沒買則填寫 "-"）
+                const qtyCells = itemHeaders.map(h => userItemQtyMap[h] ? userItemQtyMap[h] : '-');
 
                 const row = [
                     index + 1,
-                    o.groupNickname || '',
-                    o.senderName || '',
-                    `"${itemsStr.replace(/"/g, '""')}"`
+                    o.createdAt ? new Date(o.createdAt).toLocaleString() : '',
+                    `"${(o.groupNickname || '').replace(/"/g, '""')}"`,
+                    `"${(o.senderName || '').replace(/"/g, '""')}"`,
+                    ...qtyCells
                 ];
                 csvContent += row.join(',') + "\n";
             });
@@ -987,7 +1008,7 @@
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
-            link.setAttribute("download", `STAY代購_排單順序表_${new Date().toISOString().slice(0,10)}.csv`);
+            link.setAttribute("download", `STAY代購_商品排單順序表_${new Date().toISOString().slice(0,10)}.csv`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
