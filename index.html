@@ -947,72 +947,72 @@
         };
 
         /* 2. 核心升級：以【商品/款式名稱】為標題列的排單 CSV 匯出 */
-        window.exportQueueToCSV = function() {
-            const statusFilter = document.getElementById('filter-order-status').value;
-            const categoryFilter = document.getElementById('filter-order-category').value;
-            const productFilter = document.getElementById('filter-order-product').value;
+        /* 核心修正：移除標題列的 [分類] 前綴，直接顯示「商品名稱 - 款式規格」 */
+window.exportQueueToCSV = function() {
+    const statusFilter = document.getElementById('filter-order-status').value;
+    const categoryFilter = document.getElementById('filter-order-category').value;
+    const productFilter = document.getElementById('filter-order-product').value;
 
-            // 1. 篩選符合條件的訂單
-            let targetOrders = ordersCache.filter(o => o.status !== '訂單已完成');
-            if (statusFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.status === statusFilter);
-            if (categoryFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.items && o.items.some(i => i.category === categoryFilter));
-            if (productFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.items && o.items.some(i => `${i.name} (${i.variantName})` === productFilter));
+    // 1. 篩選符合條件的訂單
+    let targetOrders = ordersCache.filter(o => o.status !== '訂單已完成');
+    if (statusFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.status === statusFilter);
+    if (categoryFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.items && o.items.some(i => i.category === categoryFilter));
+    if (productFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.items && o.items.some(i => `${i.name} (${i.variantName})` === productFilter));
 
-            if (targetOrders.length === 0) return alert('目前無符合條件的排單資料。');
+    if (targetOrders.length === 0) return alert('目前無符合條件的排單資料。');
 
-            // 依下單時間由舊到新排序 (Earliest First)
-            targetOrders.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+    // 依下單時間由舊到新排序 (Earliest First)
+    targetOrders.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
 
-            // 2. 蒐集並建立所有出現在這些訂單中的「商品-規格」清單 (做為 CSV 標題欄位)
-            const itemKeySet = new Set();
-            targetOrders.forEach(o => {
-                (o.items || []).forEach(i => {
-                    if (!i.isOutOfStock) {
-                        if (categoryFilter !== 'ALL' && i.category !== categoryFilter) return;
-                        if (productFilter !== 'ALL' && `${i.name} (${i.variantName})` !== productFilter) return;
-                        itemKeySet.add(`[${i.category || '選物'}] ${i.name} - ${i.variantName}`);
-                    }
-                });
-            });
+    // 2. 蒐集商品款式（只保留：商品名稱 - 款式名稱）
+    const itemKeySet = new Set();
+    targetOrders.forEach(o => {
+        (o.items || []).forEach(i => {
+            if (!i.isOutOfStock) {
+                if (categoryFilter !== 'ALL' && i.category !== categoryFilter) return;
+                if (productFilter !== 'ALL' && `${i.name} (${i.variantName})` !== productFilter) return;
+                // 簡化標題：移除 [分類] 前綴
+                itemKeySet.add(`${i.name} - ${i.variantName}`);
+            }
+        });
+    });
 
-            const itemHeaders = Array.from(itemKeySet);
-            if (itemHeaders.length === 0) return alert('目前無未缺貨的商品款式可進行排單。');
+    const itemHeaders = Array.from(itemKeySet);
+    if (itemHeaders.length === 0) return alert('目前無未缺貨的商品款式可進行排單。');
 
-            // 3. 組成 CSV 標題列
-            let csvContent = "\uFEFF順位,下單時間,LINE群組暱稱,買家姓名," + itemHeaders.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + "\n";
+    // 3. 組成 CSV 標題列
+    let csvContent = "\uFEFF順位,下單時間,LINE群組暱稱,買家姓名," + itemHeaders.map(h => `"${h.replace(/"/g, '""')}"`).join(',') + "\n";
 
-            // 4. 逐筆填充每個買家的購買數量
-            targetOrders.forEach((o, index) => {
-                // 建立該訂單買家的購買數量映射表 Map<ItemKey, Quantity>
-                const userItemQtyMap = {};
-                (o.items || []).forEach(i => {
-                    if (!i.isOutOfStock) {
-                        const key = `[${i.category || '選物'}] ${i.name} - ${i.variantName}`;
-                        userItemQtyMap[key] = (userItemQtyMap[key] || 0) + i.quantity;
-                    }
-                });
+    // 4. 逐筆填充買家數量
+    targetOrders.forEach((o, index) => {
+        const userItemQtyMap = {};
+        (o.items || []).forEach(i => {
+            if (!i.isOutOfStock) {
+                const key = `${i.name} - ${i.variantName}`;
+                userItemQtyMap[key] = (userItemQtyMap[key] || 0) + i.quantity;
+            }
+        });
 
-                // 對應標題填寫數量（若沒買則填寫 "-"）
-                const qtyCells = itemHeaders.map(h => userItemQtyMap[h] ? userItemQtyMap[h] : '-');
+        const qtyCells = itemHeaders.map(h => userItemQtyMap[h] ? userItemQtyMap[h] : '-');
 
-                const row = [
-                    index + 1,
-                    o.createdAt ? new Date(o.createdAt).toLocaleString() : '',
-                    `"${(o.groupNickname || '').replace(/"/g, '""')}"`,
-                    `"${(o.senderName || '').replace(/"/g, '""')}"`,
-                    ...qtyCells
-                ];
-                csvContent += row.join(',') + "\n";
-            });
+        const row = [
+            index + 1,
+            o.createdAt ? new Date(o.createdAt).toLocaleString() : '',
+            `"${(o.groupNickname || '').replace(/"/g, '""')}"`,
+            `"${(o.senderName || '').replace(/"/g, '""')}"`,
+            ...qtyCells
+        ];
+        csvContent += row.join(',') + "\n";
+    });
 
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.setAttribute("download", `STAY代購_商品排單順序表_${new Date().toISOString().slice(0,10)}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        };
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", `STAY代購_商品排單順序表_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
     </script>
 </body>
 </html>
