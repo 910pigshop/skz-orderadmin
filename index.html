@@ -192,9 +192,9 @@
                                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-[#A08D7D] text-xs"></i>
                                 <input type="text" id="prod-search-input" oninput="debouncedRenderAdminProducts()" placeholder="搜尋商品名稱..." class="w-full pl-8 pr-3 py-1.5 border border-[#D7C4B7] rounded-xl text-xs bg-[#FDFBF7] focus:ring-1 focus:ring-[#967259] focus:outline-none text-[#2C221E]">
                             </div>
-                            <select id="prod-category-filter" onchange="renderAdminProducts()" class="px-2.5 py-1.5 border border-[#D7C4B7] rounded-xl text-xs bg-[#FDFBF7] font-bold text-[#2C221E] focus:ring-1 focus:ring-[#967259] focus:outline-none">
-                                <option value="ALL">全部分類</option>
-                            </select>
+                            <select id="prod-category-filter" onchange="window.renderAdminProducts()" class="px-2.5 py-1.5 border border-[#D7C4B7] rounded-xl text-xs bg-[#FDFBF7] font-bold text-[#2C221E] focus:ring-1 focus:ring-[#967259] focus:outline-none cursor-pointer">
+    <option value="ALL">全部分類</option>
+</select>
                         </div>
 
                         <div class="flex items-center gap-2 w-full sm:w-auto">
