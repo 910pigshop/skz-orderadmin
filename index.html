@@ -32,9 +32,10 @@
             <h1 class="text-base sm:text-lg md:text-xl font-bold tracking-wider flex items-center gap-2 font-serif-jp text-[#4A3B32]">
                 <i class="fa-solid fa-bread-slice text-[#967259]"></i> <span>在日stay🧭 商品管理後台</span>
             </h1>
-            <a href="https://skz-0801.vercel.app" target="_blank" rel="noopener noreferrer" class="...">
-    <i class="fa-solid fa-external-link"></i> 前往預覽前台
-</a>
+            <!-- 已修正：正確指向 Vercel 前台網址 -->
+            <a href="https://skz-0801.vercel.app/" target="_blank" rel="noopener noreferrer" class="text-xs sm:text-sm bg-[#967259] hover:bg-[#634832] text-white px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl transition flex items-center gap-1.5 font-bold shadow-sm cursor-pointer">
+                <i class="fa-solid fa-external-link"></i> 前往預覽前台
+            </a>
         </div>
     </header>
 
@@ -182,7 +183,7 @@
                 </div>
             </div>
 
-            <!-- 區塊 B：商品管理 -->
+            <!-- 區塊 B：商品管理 (新增一鍵批次上下架控制) -->
             <div id="admin-section-products" class="hidden space-y-4">
                 <div class="bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm border border-[#E3D5C5] space-y-3">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -196,9 +197,18 @@
                             </select>
                         </div>
 
-                        <button onclick="openProductModal()" class="w-full sm:w-auto bg-[#967259] hover:bg-[#634832] text-white px-4 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer whitespace-nowrap text-center">
-                            <i class="fa-solid fa-plus"></i> 新增商品
-                        </button>
+                        <div class="flex items-center gap-2 w-full sm:w-auto">
+                            <!-- 新增：批次上下架按鈕 -->
+                            <button onclick="batchToggleProductsActive(true)" class="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer whitespace-nowrap">
+                                🟢 勾選批次上架
+                            </button>
+                            <button onclick="batchToggleProductsActive(false)" class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer whitespace-nowrap">
+                                ⚪ 勾選批次下架
+                            </button>
+                            <button onclick="openProductModal()" class="bg-[#967259] hover:bg-[#634832] text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer whitespace-nowrap">
+                                <i class="fa-solid fa-plus"></i> 新增商品
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -206,7 +216,8 @@
                     <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-[750px]">
                         <thead>
                             <tr class="bg-[#F8F4EE] text-[#4A3B32] border-b border-[#E3D5C5] text-xs font-bold">
-                                <th class="p-3 w-10 text-center"><input type="checkbox" id="select-all-products" class="rounded cursor-pointer"></th>
+                                <!-- 已修正：真正的全選 Click 事件 -->
+                                <th class="p-3 w-10 text-center"><input type="checkbox" id="select-all-products" onclick="toggleSelectAllProducts(this)" class="rounded cursor-pointer"></th>
                                 <th class="p-3">圖片</th>
                                 <th class="p-3">商品名稱</th>
                                 <th class="p-3">分類</th>
@@ -590,7 +601,6 @@
                 return;
             }
 
-            // 強制時間由新到舊 (Newest First) 排序
             list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
             const statusOptions = ["待查帳", "已確認付款", "商品理貨中", "國際運輸中", "包裹已抵台", "請至賣貨便下單", "訂單已完成"];
@@ -673,7 +683,32 @@
             document.querySelectorAll('.order-checkbox').forEach(cb => cb.checked = source.checked);
         };
 
-        /* 效能優化：改用 Firestore writeBatch 批次更新 */
+        /* 修正：真正動作的商品全選按鈕 */
+        window.toggleSelectAllProducts = function(source) {
+            document.querySelectorAll('.product-checkbox').forEach(cb => cb.checked = source.checked);
+        };
+
+        /* 新增：一鍵批次切換商品上下架 */
+        window.batchToggleProductsActive = async function(targetActive) {
+            const checkboxes = document.querySelectorAll('.product-checkbox:checked');
+            if (checkboxes.length === 0) return alert('請先勾選要處理的商品！');
+            
+            const actionText = targetActive ? '上架' : '下架';
+            if (!confirm(`確定要將勾選的 ${checkboxes.length} 項商品進行【${actionText}】嗎？`)) return;
+
+            try {
+                const batch = Firestore.writeBatch(db);
+                checkboxes.forEach(cb => {
+                    const docRef = Firestore.doc(db, "products", cb.value);
+                    batch.update(docRef, { active: targetActive });
+                });
+                await batch.commit();
+                showToast(`已完成 ${checkboxes.length} 項商品【${actionText}】`);
+            } catch (err) {
+                showToast('批次變更商品狀態失敗', 'error');
+            }
+        };
+
         window.batchUpdateOrderStatus = async function() {
             const checkboxes = document.querySelectorAll('.order-checkbox:checked');
             if (checkboxes.length === 0) return alert('請先勾選訂單！');
@@ -913,7 +948,7 @@
             }
         };
 
-        /* 渲染商品列表 (含自動下架時間即時過期比對) */
+        /* 修正：精準的商品篩選邏輯與渲染 */
         function renderAdminProducts() {
             const tbody = document.getElementById('admin-products-tbody');
             const searchKeyword = document.getElementById('prod-search-input')?.value.toLowerCase().trim() || '';
@@ -924,7 +959,7 @@
                 filtered = filtered.filter(p => p.name.toLowerCase().includes(searchKeyword));
             }
             if (categoryFilter !== 'ALL') {
-                filtered = filtered.filter(p => p.category === categoryFilter);
+                filtered = filtered.filter(p => (p.category || '未分類') === categoryFilter);
             }
 
             if (filtered.length === 0) {
@@ -956,7 +991,7 @@
                 }
 
                 return `<tr class="border-b border-[#E3D5C5] hover:bg-[#F8F4EE]">` +
-                    '<td class="p-3 text-center"><input type="checkbox" class="product-checkbox rounded"></td>' +
+                    '<td class="p-3 text-center"><input type="checkbox" value="' + p.id + '" class="product-checkbox rounded cursor-pointer"></td>' +
                     '<td class="p-3"><img src="' + (p.images && p.images[0] ? p.images[0] : FALLBACK_IMAGE) + '" class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg object-cover bg-white border border-[#E3D5C5]"></td>' +
                     '<td class="p-3 font-bold text-[#2C221E] text-xs sm:text-sm">' + p.name + '</td>' +
                     '<td class="p-3"><span class="text-[11px] bg-[#F3E8DB] text-[#4A3B32] border border-[#D7C4B7] font-bold px-2 py-0.5 rounded-md">' + (p.category || '未分類') + '</span></td>' +
@@ -971,7 +1006,23 @@
             }).join('');
         }
 
-        /* 防呆與自動填入：當更改售價且預付為空時自動覆蓋預付 */
+        /* 複製當前列規格按鈕功能 */
+        window.duplicateVariantRow = function(btn) {
+            const row = btn.closest('.variant-row');
+            if (!row) return;
+
+            const name = row.querySelector('.v-name').value.trim() + ' (副本)';
+            const costJPY = row.querySelector('.v-cost').value;
+            const price = row.querySelector('.v-price').value;
+            const deposit = row.querySelector('.v-deposit').value;
+            const maxPerPerson = row.querySelector('.v-limit').value;
+            const stock = row.querySelector('.v-stock').value;
+
+            window.addVariantRow({ name, costJPY, price, deposit, maxPerPerson, stock });
+            showToast('已複製該規格欄位');
+        };
+
+        /* 新增/渲染規格列 (新增複製按鈕) */
         window.addVariantRow = function(v) {
             v = v || { name: '', costJPY: '', price: '', deposit: '', stock: '', maxPerPerson: 0 };
             const container = document.getElementById('variant-input-list');
@@ -984,7 +1035,10 @@
                 '<div class="col-span-2"><input type="number" placeholder="預付" value="' + (v.deposit !== undefined ? v.deposit : v.price) + '" required class="v-deposit w-full px-1 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-emerald-50 font-bold text-emerald-800"></div>' +
                 '<div class="col-span-1"><input type="number" placeholder="限購" value="' + (v.maxPerPerson || 0) + '" title="每人限購數量 (0為不限)" class="v-limit w-full px-1 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-amber-50 font-bold text-amber-900"></div>' +
                 '<div class="col-span-1"><input type="number" placeholder="庫存" value="' + v.stock + '" required class="v-stock w-full px-1 py-1 border border-[#D7C4B7] rounded-lg text-xs bg-white font-bold"></div>' +
-                '<div class="col-span-1 text-center"><button type="button" onclick="this.closest(\'.variant-row\').remove()" class="text-rose-500 text-xs p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button></div>';
+                '<div class="col-span-1 text-center flex items-center justify-center gap-1">' +
+                    '<button type="button" onclick="duplicateVariantRow(this)" title="複製規格" class="text-amber-700 hover:text-amber-900 text-xs p-1 cursor-pointer"><i class="fa-regular fa-copy"></i></button>' +
+                    '<button type="button" onclick="this.closest(\'.variant-row\').remove()" title="刪除規格" class="text-rose-500 hover:text-rose-700 text-xs p-1 cursor-pointer"><i class="fa-solid fa-trash-can"></i></button>' +
+                '</div>';
 
             container.appendChild(div);
         };
