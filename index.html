@@ -948,63 +948,74 @@
             }
         };
 
-        /* 修正：精準的商品篩選邏輯與渲染 */
-        function renderAdminProducts() {
-            const tbody = document.getElementById('admin-products-tbody');
-            const searchKeyword = document.getElementById('prod-search-input')?.value.toLowerCase().trim() || '';
-            const categoryFilter = document.getElementById('prod-category-filter')?.value || 'ALL';
+/* 修正：將 renderAdminProducts 掛載至 window 並精準比對分類 */
+window.renderAdminProducts = function() {
+    const tbody = document.getElementById('admin-products-tbody');
+    const searchKeyword = document.getElementById('prod-search-input')?.value.toLowerCase().trim() || '';
+    const categoryFilter = document.getElementById('prod-category-filter')?.value || 'ALL';
 
-            let filtered = products;
-            if (searchKeyword) {
-                filtered = filtered.filter(p => p.name.toLowerCase().includes(searchKeyword));
+    let filtered = products;
+
+    // 1. 關鍵字搜尋
+    if (searchKeyword) {
+        filtered = filtered.filter(p => p.name && p.name.toLowerCase().includes(searchKeyword));
+    }
+
+    // 2. 分類精準篩選
+    if (categoryFilter !== 'ALL') {
+        filtered = filtered.filter(p => {
+            const prodCategory = (p.category || '未分類').toString().trim();
+            const targetCategory = categoryFilter.toString().trim();
+            return prodCategory === targetCategory;
+        });
+    }
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-[#A08D7D] text-xs sm:text-sm">目前尚無符合的商品資料</td></tr>';
+        return;
+    }
+
+    const nowTime = new Date().getTime();
+
+    tbody.innerHTML = filtered.map(p => {
+        const isActive = p.active !== false;
+        const isExpired = p.offTime ? new Date(p.offTime).getTime() <= nowTime : false;
+
+        const variantsDisplay = (p.variants || []).map(v => 
+            `${v.name} - 售價NT$${v.price} | <span class="text-emerald-700 font-bold">預付NT$${v.deposit}</span> | ${v.maxPerPerson > 0 ? `<span class="text-amber-800 font-bold">限購:${v.maxPerPerson}</span>` : '不限購'} (庫存:${v.stock})`
+        ).join('<br>');
+
+        const toggleActiveBtn = isActive ? 
+            `<button onclick="window.toggleProductActive('${p.id}', true)" class="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold cursor-pointer">🟢 上架</button>` :
+            `<button onclick="window.toggleProductActive('${p.id}', false)" class="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold cursor-pointer">⚪ 下架</button>`;
+
+        let offTimeDisplay = '';
+        if (p.offTime) {
+            if (isExpired) {
+                offTimeDisplay = `<div class="text-[10px] text-rose-600 font-bold mt-1"><i class="fa-solid fa-clock-rotate-left"></i> 已過期 (自動隱藏)</div>`;
+            } else {
+                offTimeDisplay = `<div class="text-[10px] text-amber-700 font-bold mt-1">📅 下架: ${new Date(p.offTime).toLocaleString()}</div>`;
             }
-            if (categoryFilter !== 'ALL') {
-                filtered = filtered.filter(p => (p.category || '未分類') === categoryFilter);
-            }
-
-            if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-[#A08D7D] text-xs sm:text-sm">目前尚無符合的商品資料</td></tr>';
-                return;
-            }
-
-            const nowTime = new Date().getTime();
-
-            tbody.innerHTML = filtered.map(p => {
-                const isActive = p.active !== false;
-                const isExpired = p.offTime ? new Date(p.offTime).getTime() <= nowTime : false;
-
-                const variantsDisplay = p.variants.map(v => 
-                    `${v.name} - 售價NT$${v.price} | <span class="text-emerald-700 font-bold">預付NT$${v.deposit}</span> | ${v.maxPerPerson > 0 ? `<span class="text-amber-800 font-bold">限購:${v.maxPerPerson}</span>` : '不限購'} (庫存:${v.stock})`
-                ).join('<br>');
-
-                const toggleActiveBtn = isActive ? 
-                    `<button onclick="window.toggleProductActive('${p.id}', true)" class="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold cursor-pointer">🟢 上架</button>` :
-                    `<button onclick="window.toggleProductActive('${p.id}', false)" class="px-2 py-0.5 sm:px-2.5 sm:py-1 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold cursor-pointer">⚪ 下架</button>`;
-
-                let offTimeDisplay = '';
-                if (p.offTime) {
-                    if (isExpired) {
-                        offTimeDisplay = `<div class="text-[10px] text-rose-600 font-bold mt-1"><i class="fa-solid fa-clock-rotate-left"></i> 已過期 (自動隱藏)</div>`;
-                    } else {
-                        offTimeDisplay = `<div class="text-[10px] text-amber-700 font-bold mt-1">📅 下架: ${new Date(p.offTime).toLocaleString()}</div>`;
-                    }
-                }
-
-                return `<tr class="border-b border-[#E3D5C5] hover:bg-[#F8F4EE]">` +
-                    '<td class="p-3 text-center"><input type="checkbox" value="' + p.id + '" class="product-checkbox rounded cursor-pointer"></td>' +
-                    '<td class="p-3"><img src="' + (p.images && p.images[0] ? p.images[0] : FALLBACK_IMAGE) + '" class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg object-cover bg-white border border-[#E3D5C5]"></td>' +
-                    '<td class="p-3 font-bold text-[#2C221E] text-xs sm:text-sm">' + p.name + '</td>' +
-                    '<td class="p-3"><span class="text-[11px] bg-[#F3E8DB] text-[#4A3B32] border border-[#D7C4B7] font-bold px-2 py-0.5 rounded-md">' + (p.category || '未分類') + '</span></td>' +
-                    '<td class="p-3">' + toggleActiveBtn + offTimeDisplay + '</td>' +
-                    '<td class="p-3 text-xs text-[#2C221E] space-y-1">' + variantsDisplay + '</td>' +
-                    '<td class="p-3 text-center space-x-1 whitespace-nowrap">' +
-                        `<button onclick="window.openProductModal('${p.id}')" class="text-[#967259] font-bold p-1 cursor-pointer hover:underline text-xs"><i class="fa-solid fa-pen-to-square"></i> 編輯</button>` +
-                        `<button onclick="window.openProductModal('${p.id}', true)" class="text-amber-800 font-bold p-1 cursor-pointer hover:underline text-xs"><i class="fa-regular fa-copy"></i> 複製</button>` +
-                        `<button onclick="window.deleteProduct('${p.id}')" class="text-rose-500 font-bold p-1 cursor-pointer hover:underline text-xs"><i class="fa-solid fa-trash-can"></i> 刪除</button>` +
-                    '</td>' +
-                '</tr>';
-            }).join('');
         }
+
+        return `<tr class="border-b border-[#E3D5C5] hover:bg-[#F8F4EE]">` +
+            '<td class="p-3 text-center"><input type="checkbox" value="' + p.id + '" class="product-checkbox rounded cursor-pointer"></td>' +
+            '<td class="p-3"><img src="' + (p.images && p.images[0] ? p.images[0] : FALLBACK_IMAGE) + '" class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg object-cover bg-white border border-[#E3D5C5]"></td>' +
+            '<td class="p-3 font-bold text-[#2C221E] text-xs sm:text-sm">' + p.name + '</td>' +
+            '<td class="p-3"><span class="text-[11px] bg-[#F3E8DB] text-[#4A3B32] border border-[#D7C4B7] font-bold px-2 py-0.5 rounded-md">' + (p.category || '未分類') + '</span></td>' +
+            '<td class="p-3">' + toggleActiveBtn + offTimeDisplay + '</td>' +
+            '<td class="p-3 text-xs text-[#2C221E] space-y-1">' + variantsDisplay + '</td>' +
+            '<td class="p-3 text-center space-x-1 whitespace-nowrap">' +
+                `<button onclick="window.openProductModal('${p.id}')" class="text-[#967259] font-bold p-1 cursor-pointer hover:underline text-xs"><i class="fa-solid fa-pen-to-square"></i> 編輯</button>` +
+                `<button onclick="window.openProductModal('${p.id}', true)" class="text-amber-800 font-bold p-1 cursor-pointer hover:underline text-xs"><i class="fa-regular fa-copy"></i> 複製</button>` +
+                `<button onclick="window.deleteProduct('${p.id}')" class="text-rose-500 font-bold p-1 cursor-pointer hover:underline text-xs"><i class="fa-solid fa-trash-can"></i> 刪除</button>` +
+            '</td>' +
+        '</tr>';
+    }).join('');
+};
+
+// 確保防抖搜尋函式呼叫全域的 renderAdminProducts
+window.debouncedRenderAdminProducts = debounce(() => window.renderAdminProducts(), 250);
 
         /* 複製當前列規格按鈕功能 */
         window.duplicateVariantRow = function(btn) {
