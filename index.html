@@ -201,7 +201,7 @@
                                 <th class="p-3 w-10 text-center"><input type="checkbox" id="select-all-products" onclick="toggleSelectAllProducts(this)" class="rounded cursor-pointer"></th>
                                 <th class="p-3">圖片</th>
                                 <th class="p-3">商品名稱</th>
-                                <th class="p-[#3]">分類</th>
+                                <th class="p-3">分類</th>
                                 <th class="p-3">上架狀態與時間</th>
                                 <th class="p-3">規格 / 售價 / 預付訂金 / 限購 / 庫存</th>
                                 <th class="p-3 text-center">操作</th>
@@ -231,8 +231,21 @@
             </div>
 
             <div id="admin-section-settings" class="hidden space-y-4 sm:space-y-6">
-                <h3 class="text-base sm:text-lg font-bold text-[#4A3B32] font-serif-jp">系統與財務匯率設定</h3>
+                <h3 class="text-base sm:text-lg font-bold text-[#4A3B32] font-serif-jp">商店與財務匯率設定</h3>
                 <form id="settings-form" class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-[#E3D5C5] space-y-4 sm:space-y-6 max-w-xl">
+                    
+                    <!-- 🔥 賣貨便全站預設連結 -->
+                    <div class="bg-amber-50/70 p-3.5 sm:p-4 rounded-2xl border border-amber-200 space-y-2">
+                        <div class="font-bold text-xs sm:text-sm text-amber-900 flex items-center gap-1.5">
+                            <i class="fa-solid fa-store text-amber-700"></i> 7-11 賣貨便下單連結設定
+                        </div>
+                        <p class="text-[11px] sm:text-xs text-amber-800">當訂單貨態調整為「請至賣貨便下單」時，前台查詢頁面將會導向此賣場網址供買家下單尾款。</p>
+                        <div>
+                            <label class="block text-xs font-bold text-[#4A3B32] mb-1">賣貨便賣場網址</label>
+                            <input type="url" id="setting-myship-url" placeholder="https://myship.7-11.com.tw/general/detail/..." class="w-full px-3 py-2 border border-[#D7C4B7] rounded-xl bg-white focus:ring-1 focus:ring-[#967259] focus:outline-none text-xs sm:text-sm text-[#2C221E]">
+                        </div>
+                    </div>
+
                     <div class="bg-[#F3E8DB] p-3.5 sm:p-4 rounded-2xl border border-[#D7C4B7] space-y-2">
                         <div class="font-bold text-xs sm:text-sm text-[#4A3B32] flex items-center gap-1.5"><i class="fa-solid fa-coins text-[#967259]"></i> 日幣匯率換算設定</div>
                         <p class="text-[11px] sm:text-xs text-[#7D6B5D]">此匯率將用於計算所有商品規格的台幣成本與營利。</p>
@@ -286,7 +299,7 @@
         </div>
     </div>
 
-    <!-- 商品編輯 Modal (新增賣貨便賣場網址欄位) -->
+    <!-- 商品編輯 Modal -->
     <div id="product-modal" class="fixed inset-0 bg-[#2C221E]/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-2 sm:p-4">
         <div class="bg-[#FDFBF7] rounded-2xl shadow-2xl max-w-xl w-full p-4 sm:p-6 space-y-3 sm:space-y-4 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto border border-[#E3D5C5]">
             <h3 id="product-modal-title" class="font-bold text-base sm:text-lg text-[#4A3B32] font-serif-jp">新增商品與規格</h3>
@@ -310,14 +323,6 @@
                             <option value="false">⚪ 隱藏下架</option>
                         </select>
                     </div>
-                </div>
-
-                <!-- 新增：賣貨便專屬網址欄位 -->
-                <div class="bg-amber-50/60 p-2.5 sm:p-3 rounded-xl border border-amber-200 space-y-1">
-                    <label class="block text-xs font-bold text-amber-900 mb-1 flex items-center gap-1.5">
-                        <i class="fa-solid fa-store text-amber-700"></i> 7-11 賣貨便下單連結 (用於貨態變更為「請至賣貨便下單」時顯示)
-                    </label>
-                    <input type="url" id="prod-myship-url" placeholder="https://myship.7-11.com.tw/general/detail/..." class="w-full px-3 py-1.5 border border-[#D7C4B7] rounded-xl focus:ring-1 focus:ring-[#967259] focus:outline-none text-xs bg-white text-[#2C221E]">
                 </div>
 
                 <div>
@@ -386,7 +391,11 @@
         let ordersCache = [];
         let currentEditingOrderItems = [];
 
-        let bankSettings = { accounts: [{ name: "中華郵政 (700)", account: "0001234-5678901" }], jpyRate: 0.22 };
+        let bankSettings = { 
+            accounts: [{ name: "中華郵政 (700)", account: "0001234-5678901" }], 
+            jpyRate: 0.22,
+            myshipUrl: "https://myship.7-11.com.tw/general/detail/GM2412289778986" 
+        };
         const FALLBACK_IMAGE = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 24 24' fill='none' stroke='%23d7c4b7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E";
 
         window.showToast = function(message, type = 'success') {
@@ -481,7 +490,11 @@
             if (docSnap.exists()) {
                 const b = docSnap.data();
                 bankSettings.jpyRate = b.jpyRate !== undefined ? b.jpyRate : 0.22;
+                bankSettings.myshipUrl = b.myshipUrl || "https://myship.7-11.com.tw/general/detail/GM2412289778986";
+
                 document.getElementById('setting-jpy-rate').value = bankSettings.jpyRate;
+                document.getElementById('setting-myship-url').value = bankSettings.myshipUrl;
+
                 const bankContainer = document.getElementById('bank-accounts-input-list');
                 bankContainer.innerHTML = '';
                 if (b.accounts && b.accounts.length > 0) {
@@ -848,9 +861,6 @@
                 document.getElementById('prod-category').value = p.category || '';
                 document.getElementById('prod-active').value = (p.active !== false).toString();
                 document.getElementById('prod-off-time').value = p.offTime || '';
-                
-                // 帶入賣貨便網址
-                document.getElementById('prod-myship-url').value = p.myshipUrl || '';
 
                 const driveTextarea = document.getElementById('prod-drive-urls');
                 if (driveTextarea) {
@@ -866,7 +876,6 @@
                 form.reset();
                 idInput.value = '';
                 document.getElementById('prod-off-time').value = '';
-                document.getElementById('prod-myship-url').value = '';
                 if (titleText) titleText.textContent = '新增商品與規格';
                 window.addVariantRow({ name: '標準規格', costJPY: '', price: '', deposit: '', stock: '', maxPerPerson: 0 });
             }
@@ -886,7 +895,6 @@
                 const category = document.getElementById('prod-category').value;
                 const active = document.getElementById('prod-active').value === 'true';
                 const offTime = document.getElementById('prod-off-time').value || null;
-                const myshipUrl = document.getElementById('prod-myship-url').value.trim() || null;
 
                 const rawDriveUrls = document.getElementById('prod-drive-urls') ? document.getElementById('prod-drive-urls').value : '';
                 
@@ -917,7 +925,6 @@
                     name,
                     category,
                     offTime,
-                    myshipUrl, // 儲存賣貨便網址
                     images,
                     variants,
                     active,
@@ -1065,7 +1072,7 @@
         window.autoFillDeposit = function(priceInput) {
             const row = priceInput.closest('.variant-row');
             if (!row) return;
-            const depositInput = row.querySelector('.v-[#deposit]');
+            const depositInput = row.querySelector('.v-deposit');
             if (depositInput && (!depositInput.value || depositInput.dataset.userEdited !== 'true')) {
                 depositInput.value = priceInput.value;
             }
@@ -1084,15 +1091,19 @@
 
         window.addBankAccountRow = addBankAccountRow;
 
+        // 儲存商店設定 (含全站賣貨便預設連結)
         document.getElementById('settings-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             const jpyRate = Number(document.getElementById('setting-jpy-rate').value) || 0.22;
+            const myshipUrl = document.getElementById('setting-myship-url').value.trim();
+
             const rows = document.querySelectorAll('.bank-account-row');
             const accounts = [];
             rows.forEach(r => accounts.push({ name: r.querySelector('.bank-name-input').value.trim(), account: r.querySelector('.bank-acc-input').value.trim() }));
+            
             try {
-                await Firestore.setDoc(Firestore.doc(db, "settings", "bank"), { accounts, jpyRate });
-                showToast('商店與匯率設定儲存成功！');
+                await Firestore.setDoc(Firestore.doc(db, "settings", "bank"), { accounts, jpyRate, myshipUrl });
+                showToast('商店與賣貨便設定儲存成功！');
             } catch (err) {
                 showToast('設定儲存失敗', 'error');
             }
@@ -1158,7 +1169,7 @@
             let targetOrders = ordersCache.filter(o => o.status !== '訂單已完成');
             if (statusFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.status === statusFilter);
             if (categoryFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.items && o.items.some(i => i.category === categoryFilter));
-            if (productFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.items && o.items.some(i => `${i.name} (${i.variantName})` !== productFilter));
+            if (productFilter !== 'ALL') targetOrders = targetOrders.filter(o => o.items && o.items.some(i => `${i.name} (${i.variantName})` === productFilter));
 
             if (targetOrders.length === 0) return alert('目前無符合條件的排單資料。');
 
