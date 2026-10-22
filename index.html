@@ -4,11 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>在日stay🧭代購 - 後台管理系統</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- FontAwesome 圖示 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Google Fonts Noto Sans TC & Noto Serif JP -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+JP:wght@600&display=swap" rel="stylesheet">
@@ -21,10 +18,8 @@
 </head>
 <body class="bg-[#FDFBF7] text-[#2C221E] min-h-screen flex flex-col font-sans antialiased relative">
 
-    <!-- Toast 即時提示通知區域 -->
     <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-    <!-- 頂部導覽列 -->
     <header class="bg-[#EFE6DC] text-[#2C221E] shadow-sm sticky top-0 z-40 border-b border-[#E3D5C5]">
         <div class="max-w-6xl mx-auto px-3 py-2.5 sm:px-4 sm:py-3.5 flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-0">
             <h1 class="text-base sm:text-lg md:text-xl font-bold tracking-wider flex items-center gap-2 font-serif-jp text-[#4A3B32]">
@@ -36,10 +31,8 @@
         </div>
     </header>
 
-    <!-- 主要內容區 -->
     <main class="flex-grow max-w-6xl w-full mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6">
 
-        <!-- 登入卡片 -->
         <div id="admin-login-box" class="max-w-md mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-[#E3D5C5] mt-8 sm:mt-12 space-y-4">
             <h3 class="text-lg sm:text-xl font-bold text-[#4A3B32] text-center font-serif-jp tracking-wide"><i class="fa-solid fa-lock text-[#967259]"></i> 後台登入驗證</h3>
             <form id="admin-login-form" class="space-y-4">
@@ -51,7 +44,6 @@
             </form>
         </div>
 
-        <!-- 後台主控台 -->
         <div id="admin-dashboard" class="hidden space-y-4 sm:space-y-6">
             <div class="flex justify-between items-center border-b border-[#E3D5C5] pb-3 sm:pb-4">
                 <h2 class="text-xl sm:text-2xl font-bold text-[#4A3B32] font-serif-jp tracking-wide flex items-center gap-2">
@@ -60,7 +52,6 @@
                 <button id="admin-logout-btn" class="text-xs font-bold bg-[#EFE6DC] text-[#4A3B32] px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl hover:bg-[#E3D5C5] transition cursor-pointer border border-[#D7C4B7]">登出</button>
             </div>
 
-            <!-- 後台導覽頁籤 -->
             <div class="flex gap-1.5 sm:gap-2 border-b border-[#E3D5C5] overflow-x-auto no-scrollbar pb-1">
                 <button onclick="switchAdminTab('orders')" id="admin-tab-orders" class="px-3 py-2 sm:px-4 sm:py-2.5 font-bold text-[#967259] border-b-2 border-[#967259] whitespace-nowrap cursor-pointer text-xs sm:text-sm">處理中訂單</button>
                 <button onclick="switchAdminTab('completed')" id="admin-tab-completed" class="px-3 py-2 sm:px-4 sm:py-2.5 font-bold text-[#7D6B5D] hover:text-[#967259] whitespace-nowrap cursor-pointer text-xs sm:text-sm">已完成歷史</button>
@@ -69,7 +60,6 @@
                 <button onclick="switchAdminTab('settings')" id="admin-tab-settings" class="px-3 py-2 sm:px-4 sm:py-2.5 font-bold text-[#7D6B5D] hover:text-[#967259] whitespace-nowrap cursor-pointer text-xs sm:text-sm">商店與匯率設定</button>
             </div>
 
-            <!-- 區塊 A：處理中訂單管理 -->
             <div id="admin-section-orders" class="space-y-4">
                 <div class="bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm border border-[#E3D5C5] space-y-3">
                     <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
@@ -153,7 +143,6 @@
                 </div>
             </div>
 
-            <!-- 區塊 A-2：已完成訂單歷史 -->
             <div id="admin-section-completed" class="hidden space-y-4">
                 <div class="bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm border border-[#E3D5C5] flex justify-between items-center">
                     <h3 class="text-sm sm:text-base font-bold text-[#4A3B32] font-serif-jp"><i class="fa-solid fa-box-archive text-[#967259]"></i> 已完成交易之歷史紀錄</h3>
@@ -178,7 +167,6 @@
                 </div>
             </div>
 
-            <!-- 區塊 B：商品管理 -->
             <div id="admin-section-products" class="hidden space-y-4">
                 <div class="bg-white p-3.5 sm:p-4 rounded-2xl shadow-sm border border-[#E3D5C5] space-y-3">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -213,7 +201,7 @@
                                 <th class="p-3 w-10 text-center"><input type="checkbox" id="select-all-products" onclick="toggleSelectAllProducts(this)" class="rounded cursor-pointer"></th>
                                 <th class="p-3">圖片</th>
                                 <th class="p-3">商品名稱</th>
-                                <th class="p-3">分類</th>
+                                <th class="p-[#3]">分類</th>
                                 <th class="p-3">上架狀態與時間</th>
                                 <th class="p-3">規格 / 售價 / 預付訂金 / 限購 / 庫存</th>
                                 <th class="p-3 text-center">操作</th>
@@ -224,7 +212,6 @@
                 </div>
             </div>
 
-            <!-- 區塊 C：分類管理 -->
             <div id="admin-section-categories" class="hidden space-y-4 sm:space-y-6">
                 <h3 class="text-base sm:text-lg font-bold text-[#4A3B32] font-serif-jp">商品分類管理</h3>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
@@ -243,7 +230,6 @@
                 </div>
             </div>
 
-            <!-- 區塊 D：商店與匯率設定 -->
             <div id="admin-section-settings" class="hidden space-y-4 sm:space-y-6">
                 <h3 class="text-base sm:text-lg font-bold text-[#4A3B32] font-serif-jp">系統與財務匯率設定</h3>
                 <form id="settings-form" class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-[#E3D5C5] space-y-4 sm:space-y-6 max-w-xl">
@@ -270,7 +256,6 @@
         </div>
     </main>
 
-    <!-- 編輯訂單商品明細 Modal -->
     <div id="edit-order-items-modal" class="fixed inset-0 bg-[#2C221E]/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-2 sm:p-4">
         <div class="bg-[#FDFBF7] rounded-2xl shadow-2xl max-w-lg w-full p-4 sm:p-6 space-y-3 sm:space-y-4 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto border border-[#E3D5C5]">
             <div class="flex justify-between items-center border-b border-[#E3D5C5] pb-2.5">
@@ -301,7 +286,7 @@
         </div>
     </div>
 
-    <!-- 商品編輯 Modal (新增金額快速一鍵套用控制列) -->
+    <!-- 商品編輯 Modal (新增賣貨便賣場網址欄位) -->
     <div id="product-modal" class="fixed inset-0 bg-[#2C221E]/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-2 sm:p-4">
         <div class="bg-[#FDFBF7] rounded-2xl shadow-2xl max-w-xl w-full p-4 sm:p-6 space-y-3 sm:space-y-4 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto border border-[#E3D5C5]">
             <h3 id="product-modal-title" class="font-bold text-base sm:text-lg text-[#4A3B32] font-serif-jp">新增商品與規格</h3>
@@ -327,7 +312,14 @@
                     </div>
                 </div>
 
-                <!-- 自動下架時間欄位 -->
+                <!-- 新增：賣貨便專屬網址欄位 -->
+                <div class="bg-amber-50/60 p-2.5 sm:p-3 rounded-xl border border-amber-200 space-y-1">
+                    <label class="block text-xs font-bold text-amber-900 mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-store text-amber-700"></i> 7-11 賣貨便下單連結 (用於貨態變更為「請至賣貨便下單」時顯示)
+                    </label>
+                    <input type="url" id="prod-myship-url" placeholder="https://myship.7-11.com.tw/general/detail/..." class="w-full px-3 py-1.5 border border-[#D7C4B7] rounded-xl focus:ring-1 focus:ring-[#967259] focus:outline-none text-xs bg-white text-[#2C221E]">
+                </div>
+
                 <div>
                     <label class="block text-xs font-bold text-[#4A3B32] mb-1">📅 自動下架時間 (選填，到達後前台將自動隱藏)</label>
                     <input type="datetime-local" id="prod-off-time" class="w-full px-3 py-2 border border-[#D7C4B7] rounded-xl focus:ring-1 focus:ring-[#967259] focus:outline-none text-xs bg-white text-[#2C221E]">
@@ -340,7 +332,6 @@
                     </div>
                 </div>
 
-                <!-- 新增：快速批次帶入金額控制工具 -->
                 <div class="border-t border-[#E3D5C5] pt-3 space-y-2">
                     <div class="bg-[#F3E8DB] p-2.5 sm:p-3 rounded-xl border border-[#D7C4B7] space-y-1.5">
                         <div class="text-xs font-bold text-[#4A3B32] flex items-center justify-between">
@@ -373,7 +364,6 @@
         </div>
     </div>
 
-    <!-- Firebase 邏輯 -->
     <script type="module">
         import * as FirebaseApp from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import * as Firestore from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
@@ -408,10 +398,7 @@
             toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i> <span>${message}</span>`;
             
             container.appendChild(toast);
-            setTimeout(() => {
-                toast.classList.remove('opacity-0', 'translate-y-2');
-            }, 10);
-
+            setTimeout(() => { toast.classList.remove('opacity-0', 'translate-y-2'); }, 10);
             setTimeout(() => {
                 toast.classList.add('opacity-0', 'translate-y-2');
                 setTimeout(() => toast.remove(), 300);
@@ -437,7 +424,6 @@
             return url;
         }
 
-        /* 新增：一鍵將上面預設的金額套用到所有規格欄位 */
         window.applyQuickPricesToAll = function() {
             const cost = document.getElementById('quick-cost').value;
             const price = document.getElementById('quick-price').value;
@@ -554,9 +540,7 @@
             if (!select) return;
             const currentVal = select.value;
             let html = '<option value="ALL">全部分類</option>';
-            categories.forEach(c => {
-                html += `<option value="${c.name}">${c.name}</option>`;
-            });
+            categories.forEach(c => { html += `<option value="${c.name}">${c.name}</option>`; });
             select.innerHTML = html;
             select.value = currentVal;
         }
@@ -625,7 +609,6 @@
             }
 
             list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-
             const statusOptions = ["待查帳", "已確認付款", "商品理貨中", "國際運輸中", "包裹已抵台", "請至賣貨便下單", "訂單已完成"];
 
             tbody.innerHTML = list.map(o => {
@@ -836,7 +819,6 @@
             }
         };
 
-        /* 已修正：複製商品時不再添加 (副本) 兩字，維持原本名稱 */
         window.openProductModal = function(id, isDuplicate = false) {
             const modal = document.getElementById('product-modal');
             const form = document.getElementById('product-form');
@@ -848,7 +830,6 @@
             variantContainer.innerHTML = '';
             updateProductCategorySelect();
 
-            // 清空快捷帶入金額按鈕
             document.getElementById('quick-cost').value = '';
             document.getElementById('quick-price').value = '';
             document.getElementById('quick-deposit').value = '';
@@ -863,12 +844,14 @@
                     titleText.textContent = isDuplicate ? '複製商品並建立新項目' : '編輯商品與規格';
                 }
 
-                // 取消原本的 ' (副本)' 尾綴
                 document.getElementById('prod-name').value = p.name;
                 document.getElementById('prod-category').value = p.category || '';
                 document.getElementById('prod-active').value = (p.active !== false).toString();
                 document.getElementById('prod-off-time').value = p.offTime || '';
                 
+                // 帶入賣貨便網址
+                document.getElementById('prod-myship-url').value = p.myshipUrl || '';
+
                 const driveTextarea = document.getElementById('prod-drive-urls');
                 if (driveTextarea) {
                     driveTextarea.value = (p.images && Array.isArray(p.images)) ? p.images.join('\n') : '';
@@ -883,6 +866,7 @@
                 form.reset();
                 idInput.value = '';
                 document.getElementById('prod-off-time').value = '';
+                document.getElementById('prod-myship-url').value = '';
                 if (titleText) titleText.textContent = '新增商品與規格';
                 window.addVariantRow({ name: '標準規格', costJPY: '', price: '', deposit: '', stock: '', maxPerPerson: 0 });
             }
@@ -890,7 +874,6 @@
 
         window.closeProductModal = function() { document.getElementById('product-modal').classList.add('hidden'); };
 
-        /* 已優化：支援多連結一次貼上並自動拆分 */
         document.getElementById('product-form').addEventListener('submit', async function(e) {
             e.preventDefault();
             const saveBtn = document.getElementById('save-product-btn');
@@ -903,10 +886,10 @@
                 const category = document.getElementById('prod-category').value;
                 const active = document.getElementById('prod-active').value === 'true';
                 const offTime = document.getElementById('prod-off-time').value || null;
+                const myshipUrl = document.getElementById('prod-myship-url').value.trim() || null;
 
                 const rawDriveUrls = document.getElementById('prod-drive-urls') ? document.getElementById('prod-drive-urls').value : '';
                 
-                // 自動拆分換行、逗號或空白，支援一次貼上多個網址
                 const images = rawDriveUrls
                     .split(/[\n,\s]+/)
                     .map(url => convertGoogleDriveUrl(url))
@@ -934,6 +917,7 @@
                     name,
                     category,
                     offTime,
+                    myshipUrl, // 儲存賣貨便網址
                     images,
                     variants,
                     active,
@@ -978,7 +962,6 @@
             }
         };
 
-        /* 掛載至全域 window 並精準比對分類 */
         window.renderAdminProducts = function() {
             const tbody = document.getElementById('admin-products-tbody');
             const searchKeyword = document.getElementById('prod-search-input')?.value.toLowerCase().trim() || '';
@@ -1082,7 +1065,7 @@
         window.autoFillDeposit = function(priceInput) {
             const row = priceInput.closest('.variant-row');
             if (!row) return;
-            const depositInput = row.querySelector('.v-deposit');
+            const depositInput = row.querySelector('.v-[#deposit]');
             if (depositInput && (!depositInput.value || depositInput.dataset.userEdited !== 'true')) {
                 depositInput.value = priceInput.value;
             }
@@ -1259,4 +1242,3 @@
     </script>
 </body>
 </html>
-```<FollowUp label="想要再優化圖片上傳的方式（例如直接選擇電腦檔案上傳），還是現有這版已足夠順暢？" query="請告訴我如果想改成直接從電腦/手機選取照片檔案上傳，Firebase 需要怎麼設定 Storage？"/>
